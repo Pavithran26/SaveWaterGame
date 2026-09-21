@@ -78,3 +78,9 @@ The game should avoid adding so many effects that falling drops become difficult
 ## Suggested success measures
 
 The first measurable goal is successful round completion: users should be able to open the game, start a round, and understand the controls without support. The next measures are replay rate, average score, best combo, power-up collection rate, average round duration, and the percentage of sessions in which a player reaches the game-over screen. If analytics are added later, they should be opt-in and privacy-conscious.
+
+## Release-quality systems now implemented
+
+The game now includes a settings screen with Relaxed, Standard, and Challenge modes. Mode selection changes lives and speed before a round begins. A mission tracker asks the player to catch 15 drops and awards a bonus on completion. Toxic plastic waste appears as a new hazard and can be blocked once by the shield power-up. The game-over screen presents a rotating water-saving tip, allowing the awareness message to continue after the play session.
+
+The release acceptance test covers settings navigation, mode selection, mission progress, obstacle collisions, shield protection, all game-state renders, and safe startup in a headless environment.

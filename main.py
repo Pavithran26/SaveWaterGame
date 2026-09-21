@@ -10,6 +10,7 @@ from classes import (
     TANK_WIDTH,
     WATER_HEIGHT,
     WATER_WIDTH,
+    Obstacle,
     Particle,
     PowerUp,
     RainDrop,
@@ -17,13 +18,11 @@ from classes import (
     Water,
 )
 
-
 BASE_DIR = Path(__file__).resolve().parent
 WIDTH = 500
 FPS = 60
 HIGH_SCORE_FILE = BASE_DIR / "highscore.json"
 
-# Visual language: deep storm navy, aqua water, and bright feedback accents.
 NAVY = (7, 20, 36)
 NAVY_LIGHT = (13, 39, 61)
 BLUE = (42, 183, 235)
@@ -34,6 +33,20 @@ GREEN = (91, 225, 145)
 ORANGE = (255, 180, 78)
 RED = (255, 101, 110)
 PURPLE = (188, 130, 255)
+TOXIC = (184, 230, 76)
+
+MODES = (
+    {"name": "RELAXED", "lives": 6, "speed": 0.84, "description": "More lives • gentle storm"},
+    {"name": "STANDARD", "lives": 5, "speed": 1.0, "description": "Balanced challenge"},
+    {"name": "CHALLENGE", "lives": 4, "speed": 1.18, "description": "Fast storm • toxic waste"},
+)
+TIPS = (
+    "Turn off the tap while brushing your teeth.",
+    "Fix leaking taps early to save water every day.",
+    "Reuse water from washing vegetables for plants.",
+    "Shorter showers can save many litres of water.",
+    "Collect rainwater for your garden when possible.",
+)
 
 
 class Game:
@@ -50,6 +63,7 @@ class Game:
         self.font_tiny = pygame.font.SysFont("dejavusans", 11, bold=True)
         self.load_assets()
         self.high_score = self.load_high_score()
+        self.mode_index = 1
         self.rain = [RainDrop() for _ in range(62)]
         self.state = "menu"
         self.reset_round()
@@ -100,22 +114,32 @@ class Game:
         except OSError:
             pass
 
+    @property
+    def mode(self):
+        return MODES[self.mode_index]
+
     def reset_round(self):
-        self.tank = Tank()
+        self.tank = Tank(speed=320 * self.mode["speed"])
         self.waters = []
+        self.obstacles = []
         self.powerups = []
         self.particles = []
         self.score = 0
-        self.lives = 5
+        self.lives = self.mode["lives"]
         self.combo = 0
         self.best_combo = 0
+        self.drops_caught = 0
+        self.mission_target = 15
+        self.mission_claimed = False
         self.level = 1
         self.spawn_timer = 0.0
+        self.obstacle_timer = 0.0
         self.powerup_timer = 7.0
         self.total_time = 0.0
         self.banner = ""
         self.banner_timer = 0.0
         self.shield = 0
+        self.end_tip = random.choice(TIPS)
 
     def start_round(self):
         self.reset_round()
@@ -128,6 +152,7 @@ class Game:
 
     def finish_round(self):
         self.state = "game_over"
+        self.end_tip = random.choice(TIPS)
         if self.score > self.high_score:
             self.high_score = self.score
             self.save_high_score()
@@ -137,7 +162,7 @@ class Game:
             sound.play()
 
     def spawn_interval(self):
-        return max(0.18, 0.82 - self.level * 0.045)
+        return max(0.16, (0.82 - self.level * 0.045) / self.mode["speed"])
 
     def create_particles(self, position, color, amount=10):
         self.particles.extend(Particle(position[0], position[1], color) for _ in range(amount))
@@ -147,52 +172,81 @@ class Game:
         for streak in self.rain:
             streak.update(dt, intensity)
 
+    def lose_life(self, position, banner):
+        if self.shield:
+            self.shield = 0
+            self.banner = "SHIELD BLOCKED THE HAZARD"
+            self.banner_timer = 1.15
+            self.create_particles(position, PURPLE, 14)
+            return False
+        self.lives -= 1
+        self.combo = 0
+        self.banner = banner
+        self.banner_timer = 1.0
+        self.create_particles(position, RED, 9)
+        self.play_sound(self.miss_sound)
+        return self.lives <= 0
+
     def update(self, dt):
         keys = pygame.key.get_pressed()
         direction = int(keys[pygame.K_RIGHT]) - int(keys[pygame.K_LEFT])
         self.tank.move(direction, dt)
         self.total_time += dt
         self.spawn_timer += dt
+        self.obstacle_timer += dt
         self.powerup_timer -= dt
         self.banner_timer = max(0, self.banner_timer - dt)
-
         self.level = 1 + self.score // 10
+
         while self.spawn_timer >= self.spawn_interval():
             self.spawn_timer -= self.spawn_interval()
             self.waters.append(Water())
+
+        obstacle_interval = max(2.6, (7.0 - self.level * 0.35) / self.mode["speed"])
+        if self.total_time > 5 and self.obstacle_timer >= obstacle_interval:
+            self.obstacle_timer = 0
+            self.obstacles.append(Obstacle())
+
         if self.powerup_timer <= 0 and len(self.powerups) < 2:
             self.powerups.append(PowerUp())
             self.powerup_timer = random.uniform(11, 16)
 
-        water_speed = 205 + min(self.level * 14, 160)
+        water_speed = (205 + min(self.level * 14, 160)) * self.mode["speed"]
         for drop in self.waters[:]:
             drop.update(water_speed, dt)
             if drop.collides_with(self.tank):
                 self.waters.remove(drop)
+                self.drops_caught += 1
                 self.combo += 1
                 self.best_combo = max(self.best_combo, self.combo)
                 multiplier = min(5, 1 + self.combo // 5)
                 self.score += multiplier
                 self.create_particles(drop.rect.center, BLUE_LIGHT, 12)
                 self.play_sound(self.catch_sound)
-                if self.combo % 5 == 0:
+                if self.drops_caught >= self.mission_target and not self.mission_claimed:
+                    self.mission_claimed = True
+                    self.score += 10
+                    self.banner = "MISSION COMPLETE  +10"
+                    self.banner_timer = 1.5
+                    self.create_particles(drop.rect.center, GREEN, 20)
+                elif self.combo % 5 == 0:
                     self.banner = f"COMBO x{multiplier}  +{multiplier}"
                     self.banner_timer = 1.25
             elif drop.missed():
                 self.waters.remove(drop)
-                if self.shield:
-                    self.shield = 0
-                    self.banner = "SHIELD SAVED THE DROP"
-                    self.banner_timer = 1.1
-                    self.create_particles((self.tank.rect.centerx, HEIGHT - 64), PURPLE, 14)
-                else:
-                    self.lives -= 1
-                    self.combo = 0
-                    self.create_particles((drop.rect.centerx, HEIGHT - 18), RED, 7)
-                    self.play_sound(self.miss_sound)
-                    if self.lives <= 0:
-                        self.finish_round()
-                        return
+                if self.lose_life(drop.rect.center, "DROP MISSED"):
+                    self.finish_round()
+                    return
+
+        for obstacle in self.obstacles[:]:
+            obstacle.update(155 * self.mode["speed"] + self.level * 7, dt)
+            if obstacle.collides_with(self.tank):
+                self.obstacles.remove(obstacle)
+                if self.lose_life(obstacle.rect.center, "TOXIC WASTE HIT"):
+                    self.finish_round()
+                    return
+            elif obstacle.missed():
+                self.obstacles.remove(obstacle)
 
         for powerup in self.powerups[:]:
             powerup.update(145 + self.level * 8, dt)
@@ -228,13 +282,7 @@ class Game:
         self.screen.blit(shade, (0, 0))
         rain_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         for streak in self.rain:
-            pygame.draw.line(
-                rain_layer,
-                (BLUE_LIGHT[0], BLUE_LIGHT[1], BLUE_LIGHT[2], streak.alpha),
-                (streak.x, int(streak.y)),
-                (streak.x - 3, int(streak.y + streak.length)),
-                1,
-            )
+            pygame.draw.line(rain_layer, (*BLUE_LIGHT, streak.alpha), (streak.x, int(streak.y)), (streak.x - 3, int(streak.y + streak.length)), 1)
         self.screen.blit(rain_layer, (0, 0))
 
     def draw_heart(self, center, color, scale=1.0):
@@ -258,21 +306,29 @@ class Game:
         pygame.draw.line(self.screen, NAVY, (x, y - 5), (x, y + 6), 2)
         pygame.draw.line(self.screen, NAVY, (x - 4, y), (x + 4, y), 2)
 
+    def draw_trash_icon(self, center):
+        x, y = center
+        pygame.draw.rect(self.screen, TOXIC, (x - 8, y - 7, 16, 17), border_radius=3)
+        pygame.draw.rect(self.screen, TOXIC, (x - 10, y - 10, 20, 3), border_radius=2)
+        pygame.draw.line(self.screen, NAVY, (x - 3, y - 3), (x - 3, y + 6), 2)
+        pygame.draw.line(self.screen, NAVY, (x + 3, y - 3), (x + 3, y + 6), 2)
+
     def draw_hud(self):
-        pygame.draw.rect(self.screen, (5, 17, 31), (0, 0, WIDTH, 68))
-        pygame.draw.line(self.screen, BLUE, (0, 67), (WIDTH, 67), 2)
+        pygame.draw.rect(self.screen, (5, 17, 31), (0, 0, WIDTH, 82))
+        pygame.draw.line(self.screen, BLUE, (0, 81), (WIDTH, 81), 2)
         self.screen.blit(self.font_tiny.render("SAVE WATER", True, BLUE_LIGHT), (17, 10))
-        self.screen.blit(self.font_tiny.render(f"LEVEL {self.level}", True, ORANGE), (17, 31))
+        self.screen.blit(self.font_tiny.render(f"{self.mode['name']}  •  LV {self.level}", True, ORANGE), (17, 31))
         self.draw_text(str(self.score), self.font_large, WHITE, (244, 24))
         self.draw_text("SCORE", self.font_tiny, MUTED, (244, 51))
-        for index in range(5):
-            self.draw_heart((366 + index * 18, 18), RED if index < self.lives else NAVY_LIGHT, 0.75)
-        self.draw_text("LIVES", self.font_tiny, MUTED, (402, 48))
+        for index in range(self.mode["lives"]):
+            self.draw_heart((355 + index * 17, 18), RED if index < self.lives else NAVY_LIGHT, 0.68)
+        self.draw_text("LIVES", self.font_tiny, MUTED, (382, 48))
         if self.shield:
-            self.draw_shield_icon((475, 22))
-        pygame.draw.rect(self.screen, NAVY_LIGHT, (180, 59, 132, 4), border_radius=2)
-        progress = (self.score % 10) / 10
-        pygame.draw.rect(self.screen, BLUE, (180, 59, round(132 * progress), 4), border_radius=2)
+            self.draw_shield_icon((470, 22))
+        pygame.draw.rect(self.screen, NAVY_LIGHT, (175, 72, 155, 4), border_radius=2)
+        mission_progress = min(1, self.drops_caught / self.mission_target)
+        pygame.draw.rect(self.screen, GREEN, (175, 72, round(155 * mission_progress), 4), border_radius=2)
+        self.draw_text(f"MISSION {self.drops_caught}/{self.mission_target}", self.font_tiny, MUTED, (252, 76))
 
     def draw_powerup(self, powerup):
         x, y = powerup.rect.centerx, powerup.rect.centery + powerup.bob_offset
@@ -283,6 +339,10 @@ class Game:
             self.draw_shield_icon((x, y), True)
         else:
             pygame.draw.polygon(self.screen, color, [(x + 2, y - 11), (x - 6, y + 1), (x - 1, y + 1), (x - 3, y + 11), (x + 7, y - 3), (x + 1, y - 3)])
+
+    def draw_obstacle(self, obstacle):
+        self.draw_trash_icon((obstacle.rect.centerx + obstacle.wobble, obstacle.rect.centery))
+        pygame.draw.circle(self.screen, TOXIC, obstacle.rect.center, 18, 1)
 
     def draw_particles(self):
         for particle in self.particles:
@@ -295,6 +355,8 @@ class Game:
         self.draw_background()
         for drop in self.waters:
             self.screen.blit(self.water_image, drop.rect)
+        for obstacle in self.obstacles:
+            self.draw_obstacle(obstacle)
         for powerup in self.powerups:
             self.draw_powerup(powerup)
         self.draw_particles()
@@ -304,29 +366,44 @@ class Game:
         self.screen.blit(self.tank_image, self.tank.rect)
         self.draw_hud()
         if self.combo >= 2:
-            self.draw_text(f"COMBO {self.combo}", self.font_small, GREEN, (WIDTH // 2, 88))
+            self.draw_text(f"COMBO {self.combo}", self.font_small, GREEN, (WIDTH // 2, 101))
         if self.banner_timer > 0:
-            self.draw_text(self.banner, self.font_body, ORANGE, (WIDTH // 2, 112))
+            self.draw_text(self.banner, self.font_body, ORANGE, (WIDTH // 2, 126))
 
     def draw_panel(self, height=250):
         panel = pygame.Surface((WIDTH - 56, height), pygame.SRCALPHA)
         panel.fill((5, 18, 32, 232))
-        self.screen.blit(panel, (28, (HEIGHT - height) // 2))
-        pygame.draw.rect(self.screen, BLUE, (28, (HEIGHT - height) // 2, WIDTH - 56, height), 2, border_radius=12)
+        top = (HEIGHT - height) // 2
+        self.screen.blit(panel, (28, top))
+        pygame.draw.rect(self.screen, BLUE, (28, top, WIDTH - 56, height), 2, border_radius=12)
 
     def draw_menu(self):
         self.draw_background()
-        self.draw_panel(330)
-        self.draw_drop_icon((WIDTH // 2, 77), BLUE_LIGHT, 1.4)
-        self.draw_text("SAVE", self.font_title, WHITE, (WIDTH // 2, 120))
-        self.draw_text("WATER", self.font_title, BLUE_LIGHT, (WIDTH // 2, 160))
-        self.draw_text("STORM CATCHER", self.font_tiny, ORANGE, (WIDTH // 2, 194))
-        pygame.draw.rect(self.screen, BLUE, (128, 222, 244, 52), border_radius=10)
-        self.draw_text("PRESS ENTER TO PLAY", self.font_body, NAVY, (WIDTH // 2, 248))
-        self.draw_text("←  →   Move tank", self.font_small, WHITE, (WIDTH // 2, 305))
-        self.draw_text("Catch drops  •  Build combos  •  Grab power-ups", self.font_tiny, MUTED, (WIDTH // 2, 330))
-        self.draw_text("P Pause     M Sound     ESC Quit", self.font_small, MUTED, (WIDTH // 2, 356))
-        self.draw_text(f"BEST SCORE  {self.high_score}", self.font_small, GREEN, (WIDTH // 2, 388))
+        self.draw_panel(350)
+        self.draw_drop_icon((WIDTH // 2, 70), BLUE_LIGHT, 1.4)
+        self.draw_text("SAVE", self.font_title, WHITE, (WIDTH // 2, 112))
+        self.draw_text("WATER", self.font_title, BLUE_LIGHT, (WIDTH // 2, 152))
+        self.draw_text("STORM CATCHER", self.font_tiny, ORANGE, (WIDTH // 2, 187))
+        pygame.draw.rect(self.screen, BLUE, (128, 215, 244, 52), border_radius=10)
+        self.draw_text("PRESS ENTER TO PLAY", self.font_body, NAVY, (WIDTH // 2, 241))
+        self.draw_text(f"MODE  {self.mode['name']}", self.font_small, GREEN, (WIDTH // 2, 294))
+        self.draw_text("S  Settings", self.font_small, WHITE, (WIDTH // 2, 320))
+        self.draw_text("←  →   Move tank", self.font_small, WHITE, (WIDTH // 2, 346))
+        self.draw_text("P Pause   M Sound   ESC Quit", self.font_tiny, MUTED, (WIDTH // 2, 370))
+        self.draw_text(f"BEST SCORE  {self.high_score}", self.font_small, GREEN, (WIDTH // 2, 398))
+
+    def draw_settings(self):
+        self.draw_background()
+        self.draw_panel(310)
+        self.draw_text("SETTINGS", self.font_title, WHITE, (WIDTH // 2, 125))
+        self.draw_text("Choose your storm", self.font_body, MUTED, (WIDTH // 2, 160))
+        pygame.draw.rect(self.screen, NAVY_LIGHT, (75, 190, 350, 66), border_radius=10)
+        self.draw_text("‹", self.font_title, BLUE_LIGHT, (105, 223))
+        self.draw_text(self.mode["name"], self.font_large, BLUE_LIGHT, (WIDTH // 2, 216))
+        self.draw_text("›", self.font_title, BLUE_LIGHT, (395, 223))
+        self.draw_text(self.mode["description"], self.font_small, MUTED, (WIDTH // 2, 242))
+        self.draw_text(f"Lives: {self.mode['lives']}     Drop speed: {self.mode['speed']:.2f}x", self.font_small, WHITE, (WIDTH // 2, 288))
+        self.draw_text("← → Change mode   ENTER Start   ESC Back", self.font_small, WHITE, (WIDTH // 2, 334))
 
     def draw_pause(self):
         self.draw_playfield()
@@ -340,19 +417,23 @@ class Game:
 
     def draw_game_over(self):
         self.draw_background()
-        self.draw_panel(300)
-        self.draw_text("STORM COMPLETE", self.font_large, WHITE, (WIDTH // 2, 135))
-        self.draw_drop_icon((WIDTH // 2, 178), BLUE_LIGHT, 1.0)
-        self.draw_text(f"{self.score}", self.font_title, BLUE_LIGHT, (WIDTH // 2, 220))
-        self.draw_text(f"SCORE  •  LEVEL {self.level}  •  BEST COMBO {self.best_combo}", self.font_tiny, MUTED, (WIDTH // 2, 250))
-        best_color = GREEN if self.score >= self.high_score else MUTED
-        self.draw_text(f"Best score  {self.high_score}", self.font_body, best_color, (WIDTH // 2, 282))
-        self.draw_text("Press R to play again", self.font_body, WHITE, (WIDTH // 2, 325))
-        self.draw_text("ESC returns to menu", self.font_small, MUTED, (WIDTH // 2, 355))
+        self.draw_panel(330)
+        self.draw_text("STORM COMPLETE", self.font_large, WHITE, (WIDTH // 2, 112))
+        self.draw_drop_icon((WIDTH // 2, 155), BLUE_LIGHT, 1.0)
+        self.draw_text(str(self.score), self.font_title, BLUE_LIGHT, (WIDTH // 2, 196))
+        self.draw_text(f"SCORE  •  {self.mode['name']}  •  LEVEL {self.level}", self.font_tiny, MUTED, (WIDTH // 2, 225))
+        self.draw_text(f"Best combo  {self.best_combo}     Best score  {self.high_score}", self.font_small, GREEN, (WIDTH // 2, 253))
+        mission_text = "MISSION COMPLETE" if self.mission_claimed else f"Mission: catch {self.mission_target} drops"
+        self.draw_text(mission_text, self.font_small, ORANGE if self.mission_claimed else MUTED, (WIDTH // 2, 282))
+        self.draw_text("WATER-SAVING TIP", self.font_tiny, BLUE_LIGHT, (WIDTH // 2, 315))
+        self.draw_text(self.end_tip, self.font_tiny, WHITE, (WIDTH // 2, 337))
+        self.draw_text("R  Play again     ESC  Menu", self.font_small, WHITE, (WIDTH // 2, 374))
 
     def draw(self):
         if self.state == "menu":
             self.draw_menu()
+        elif self.state == "settings":
+            self.draw_settings()
         elif self.state == "playing":
             self.draw_playfield()
         elif self.state == "paused":
@@ -372,6 +453,12 @@ class Game:
             self.state = "menu"
             if self.audio_enabled:
                 pygame.mixer.music.stop()
+        elif self.state == "menu" and event.key == pygame.K_s:
+            self.state = "settings"
+        elif self.state == "settings" and event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            self.mode_index = (self.mode_index + (1 if event.key == pygame.K_RIGHT else -1)) % len(MODES)
+        elif self.state == "settings" and event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            self.start_round()
         elif self.state == "menu" and event.key in (pygame.K_RETURN, pygame.K_SPACE):
             self.start_round()
         elif self.state == "playing" and event.key == pygame.K_p:

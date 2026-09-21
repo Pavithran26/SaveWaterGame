@@ -117,3 +117,25 @@ class PowerUp:
     @property
     def bob_offset(self):
         return round(math.sin(self.phase) * 3)
+
+
+class Obstacle:
+    """Toxic plastic waste that penalizes careless movement."""
+
+    def __init__(self):
+        self.rect = pygame.Rect(random.randint(20, WIDTH - 48), -28, 28, 28)
+        self.phase = random.random() * math.tau
+
+    def update(self, speed, dt):
+        self.rect.y += round(speed * dt)
+        self.phase += dt * 3
+
+    def missed(self):
+        return self.rect.top > HEIGHT
+
+    def collides_with(self, tank):
+        return self.rect.colliderect(tank.rect)
+
+    @property
+    def wobble(self):
+        return round(math.sin(self.phase) * 2)

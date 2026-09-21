@@ -47,3 +47,10 @@ The interface uses a storm-themed navy and aqua palette, animated rain streaks, 
 ## Product direction
 
 The game is designed as a short, friendly awareness experience that feels like a small arcade product rather than a prototype. Future releases can add conservation tips, difficulty modes, accessibility options, localization, and reviewed educational content.
+
+## Release-quality features
+
+The current release adds three selectable storm modes from **S Settings**: Relaxed, Standard, and Challenge. Each mode changes lives and storm speed. Every round also includes a mission to catch 15 drops. Completing it grants a bonus and shows a mission-complete banner.
+
+Toxic waste obstacles appear later in a round, especially in Challenge mode. Hitting one costs a life unless the shield power-up blocks it. The game-over screen includes a short water-saving tip so the awareness message continues after the arcade round.
+
