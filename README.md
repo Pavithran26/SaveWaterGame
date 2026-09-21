@@ -64,3 +64,14 @@ At 25, 50, 75, and 100 points, the storm automatically pauses and shows an anima
 Firebase Google Auth is **not required for the current desktop game**. The game is intentionally offline, stores the best score locally, and does not need accounts. Adding authentication now would add browser OAuth, token handling, account recovery, privacy, and deployment complexity without improving the core gameplay.
 
 Firebase becomes appropriate if the product adds cloud saves, cross-device profiles, verified online leaderboards, achievements tied to accounts, or remote analytics. At that point, Firebase Authentication and Firestore can be introduced behind an optional online mode. The desktop client must use a public client configuration only and must never contain Firebase Admin or service-account secrets.
+
+## Level-based worlds and event weather
+
+The playfield now changes its atmosphere as the level rises:
+
+- **Levels 1–2 — Calm Drizzle:** soft rain and a calm blue mood.
+- **Levels 3–4 — Rainy Afternoon:** stronger rain with gold drops beginning to appear.
+- **Levels 5–6 — Thunderstorm:** purple storm tint, thunder event banners, lightning flashes, and rainbow drops.
+- **Level 7+ — Monsoon Surge:** the heaviest rain, warm gold accent, and the fastest event rhythm.
+
+Special drops are intentionally matched to their feedback: normal drops give `+1`, gold drops give `+3`, and rainbow drops give `+5`. The active world name and event message remain visible in the HUD, while lightning events create a short interactive flash without stopping the game.

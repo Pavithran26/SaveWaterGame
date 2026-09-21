@@ -94,3 +94,11 @@ At 25, 50, 75, and 100 points, gameplay automatically pauses so the player can a
 Firebase Google Auth is not needed for the current offline Pygame release. The game has local high-score persistence and no user account, cloud save, or online leaderboard requirement. Adding authentication now would increase implementation and privacy complexity without improving the core experience.
 
 Firebase should be introduced only if the product commits to cloud saves, cross-device profiles, verified leaderboards, account-based achievements, or opt-in remote analytics. The safe future architecture is an optional online mode using Firebase Authentication and Firestore. The desktop client may contain public Firebase client configuration, but it must never ship Admin SDK credentials or service-account secrets.
+
+## Level-based world and event system
+
+The game now changes its visual identity by level instead of showing one static background throughout the session. Levels 1–2 use a Calm Drizzle mood. Levels 3–4 introduce a Rainy Afternoon mood and gold drops. Levels 5–6 become a Thunderstorm with purple tint, thunder banners, lightning flashes, and rainbow drops. Level 7 and above become a Monsoon Surge with the strongest rain and event rhythm.
+
+The scoring model is readable and matched to the visual language. Normal water drops award one point, gold drops award three points, and rainbow drops award five points before the active combo multiplier is applied. The HUD displays the active world name, the current level, the mission progress, and short event messages so the player always understands why the screen changed.
+
+The event system is intentionally interactive but non-blocking. A lightning flash adds urgency without removing control. World transitions announce the next weather phase. Special-drop banners explain the exact reward. This keeps the game impressive while preserving the core skill of moving the tank and catching water.

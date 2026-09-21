@@ -49,6 +49,13 @@ TIPS = (
     "Shorter showers can save many litres of water.",
     "Collect rainwater for your garden when possible.",
 )
+WORLDS = (
+    {"name": "CALM DRIZZLE", "tint": (18, 37, 58), "rain": 0.72, "accent": BLUE_LIGHT, "event": "A calm cloudburst begins"},
+    {"name": "RAINY AFTERNOON", "tint": (12, 31, 52), "rain": 1.0, "accent": BLUE, "event": "The rain is picking up"},
+    {"name": "THUNDERSTORM", "tint": (22, 20, 52), "rain": 1.32, "accent": PURPLE, "event": "Thunder rolls across the sky"},
+    {"name": "MONSOON SURGE", "tint": (26, 18, 42), "rain": 1.65, "accent": GOLD, "event": "The monsoon surge is here"},
+)
+DROP_LABELS = {"normal": "+1", "gold": "GOLD DROP  +3", "rainbow": "RAINBOW DROP  +5"}
 
 
 class Game:
@@ -120,6 +127,10 @@ class Game:
     def mode(self):
         return MODES[self.mode_index]
 
+    @property
+    def world(self):
+        return WORLDS[min((self.level - 1) // 2, len(WORLDS) - 1)]
+
     def reset_round(self):
         self.tank = Tank(speed=320 * self.mode["speed"])
         self.waters = []
@@ -146,6 +157,11 @@ class Game:
         self.celebration_milestone = 0
         self.celebration_timer = 0.0
         self.celebration_kind = "milestone"
+        self.thunder_timer = random.uniform(4.0, 8.0)
+        self.lightning_flash = 0.0
+        self.world_banner = self.world["event"]
+        self.world_banner_timer = 2.0
+        self.last_world_name = self.world["name"]
 
     def start_round(self):
         self.reset_round()
@@ -194,9 +210,27 @@ class Game:
         self.particles.extend(Particle(position[0], position[1], color) for _ in range(amount))
 
     def update_rain(self, dt):
-        intensity = 1.0 + (self.level - 1) * 0.08 if self.state == "playing" else 0.65
+        intensity = self.world["rain"] if self.state == "playing" else 0.65
         for streak in self.rain:
             streak.update(dt, intensity)
+        if self.state == "playing" and self.level >= 5:
+            self.thunder_timer -= dt
+            self.lightning_flash = max(0, self.lightning_flash - dt)
+            if self.thunder_timer <= 0:
+                self.thunder_timer = random.uniform(5.0, 10.0)
+                self.lightning_flash = 0.20
+                self.banner = "LIGHTNING STRIKE  •  HOLD STEADY"
+                self.banner_timer = 1.0
+                self.create_particles((random.randint(70, WIDTH - 70), 105), BLUE_LIGHT, 18)
+
+    def spawn_water(self):
+        kind = "normal"
+        roll = random.random()
+        if self.level >= 3 and roll < 0.08:
+            kind = "gold"
+        if self.level >= 5 and roll < 0.025:
+            kind = "rainbow"
+        return Water(kind=kind)
 
     def lose_life(self, position, banner):
         if self.shield:
@@ -222,11 +256,16 @@ class Game:
         self.obstacle_timer += dt
         self.powerup_timer -= dt
         self.banner_timer = max(0, self.banner_timer - dt)
+        self.world_banner_timer = max(0, self.world_banner_timer - dt)
         self.level = 1 + self.score // 10
+        if self.world["name"] != self.last_world_name:
+            self.last_world_name = self.world["name"]
+            self.world_banner = self.world["event"]
+            self.world_banner_timer = 2.0
 
         while self.spawn_timer >= self.spawn_interval():
             self.spawn_timer -= self.spawn_interval()
-            self.waters.append(Water())
+            self.waters.append(self.spawn_water())
 
         obstacle_interval = max(2.6, (7.0 - self.level * 0.35) / self.mode["speed"])
         if self.total_time > 5 and self.obstacle_timer >= obstacle_interval:
@@ -246,8 +285,10 @@ class Game:
                 self.combo += 1
                 self.best_combo = max(self.best_combo, self.combo)
                 multiplier = min(5, 1 + self.combo // 5)
-                self.add_score(multiplier)
-                self.create_particles(drop.rect.center, BLUE_LIGHT, 12)
+                earned = drop.points * multiplier
+                self.add_score(earned)
+                drop_color = BLUE_LIGHT if drop.kind == "normal" else GOLD if drop.kind == "gold" else (255, 120, 220)
+                self.create_particles(drop.rect.center, drop_color, 16 if drop.kind != "normal" else 12)
                 self.play_sound(self.catch_sound)
                 if self.drops_caught >= self.mission_target and not self.mission_claimed:
                     self.mission_claimed = True
@@ -255,6 +296,9 @@ class Game:
                     self.banner = "MISSION COMPLETE  +10"
                     self.banner_timer = 1.5
                     self.create_particles(drop.rect.center, GREEN, 20)
+                elif drop.kind != "normal":
+                    self.banner = f"{DROP_LABELS[drop.kind]}  x{multiplier}  = +{earned}"
+                    self.banner_timer = 1.35
                 elif self.combo % 5 == 0:
                     self.banner = f"COMBO x{multiplier}  +{multiplier}"
                     self.banner_timer = 1.25
@@ -306,10 +350,23 @@ class Game:
         shade = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         shade.fill((NAVY[0], NAVY[1], NAVY[2], 142))
         self.screen.blit(shade, (0, 0))
+        world_tint = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        world_tint.fill((*self.world["tint"], 58))
+        self.screen.blit(world_tint, (0, 0))
+        cloud_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        cloud_alpha = min(100, 35 + self.level * 8)
+        for x, y, size in ((45, 72, 1.0), (220, 94, 1.25), (405, 58, 0.9)):
+            pygame.draw.ellipse(cloud_layer, (8, 18, 34, cloud_alpha), (x - 42 * size, y - 10 * size, 92 * size, 28 * size))
+            pygame.draw.ellipse(cloud_layer, (8, 18, 34, cloud_alpha), (x - 20 * size, y - 24 * size, 58 * size, 38 * size))
+        self.screen.blit(cloud_layer, (0, 0))
         rain_layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         for streak in self.rain:
             pygame.draw.line(rain_layer, (*BLUE_LIGHT, streak.alpha), (streak.x, int(streak.y)), (streak.x - 3, int(streak.y + streak.length)), 1)
         self.screen.blit(rain_layer, (0, 0))
+        if self.lightning_flash > 0:
+            flash = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            flash.fill((235, 245, 255, round(160 * self.lightning_flash / 0.20)))
+            self.screen.blit(flash, (0, 0))
 
     def draw_heart(self, center, color, scale=1.0):
         x, y = center
@@ -323,6 +380,14 @@ class Game:
         radius = max(3, round(7 * scale))
         pygame.draw.circle(self.screen, color, (x, y + radius // 2), radius)
         pygame.draw.polygon(self.screen, color, [(x, y - radius * 1.65), (x - radius, y + 2), (x + radius, y + 2)])
+
+    def draw_special_drop(self, drop):
+        color = GOLD if drop.kind == "gold" else (255, 120, 220)
+        self.draw_drop_icon(drop.rect.center, color, 1.0)
+        pygame.draw.circle(self.screen, WHITE, drop.rect.center, 13, 1)
+        if drop.kind == "rainbow":
+            for offset, ring_color in ((-4, RED), (0, ORANGE), (4, GREEN)):
+                pygame.draw.arc(self.screen, ring_color, (drop.rect.x + 2, drop.rect.y + offset, drop.rect.width - 4, drop.rect.height - 4), 0.4, 2.7, 2)
 
     def draw_shield_icon(self, center, active=True):
         x, y = center
@@ -344,6 +409,7 @@ class Game:
         pygame.draw.line(self.screen, BLUE, (0, 81), (WIDTH, 81), 2)
         self.screen.blit(self.font_tiny.render("SAVE WATER", True, BLUE_LIGHT), (17, 10))
         self.screen.blit(self.font_tiny.render(f"{self.mode['name']}  •  LV {self.level}", True, ORANGE), (17, 31))
+        self.draw_text(self.world["name"], self.font_tiny, self.world["accent"], (82, 57))
         self.draw_text(str(self.score), self.font_large, WHITE, (244, 24))
         self.draw_text("SCORE", self.font_tiny, MUTED, (244, 51))
         for index in range(self.mode["lives"]):
@@ -380,7 +446,10 @@ class Game:
     def draw_playfield(self):
         self.draw_background()
         for drop in self.waters:
-            self.screen.blit(self.water_image, drop.rect)
+            if drop.kind == "normal":
+                self.screen.blit(self.water_image, drop.rect)
+            else:
+                self.draw_special_drop(drop)
         for obstacle in self.obstacles:
             self.draw_obstacle(obstacle)
         for powerup in self.powerups:
@@ -395,6 +464,8 @@ class Game:
             self.draw_text(f"COMBO {self.combo}", self.font_small, GREEN, (WIDTH // 2, 101))
         if self.banner_timer > 0:
             self.draw_text(self.banner, self.font_body, ORANGE, (WIDTH // 2, 126))
+        if self.world_banner_timer > 0:
+            self.draw_text(self.world_banner, self.font_small, self.world["accent"], (WIDTH // 2, 148))
 
     def draw_panel(self, height=250):
         panel = pygame.Surface((WIDTH - 56, height), pygame.SRCALPHA)

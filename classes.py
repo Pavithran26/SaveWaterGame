@@ -15,9 +15,11 @@ TANK_HEIGHT = 80
 class Water:
     """A falling water drop represented by a collision rectangle."""
 
-    def __init__(self, x=None):
+    def __init__(self, x=None, kind="normal"):
         if x is None:
             x = random.randint(0, WIDTH - WATER_WIDTH)
+        self.kind = kind
+        self.points = {"normal": 1, "gold": 3, "rainbow": 5}.get(kind, 1)
         self.rect = pygame.Rect(x, -WATER_HEIGHT, WATER_WIDTH, WATER_HEIGHT)
 
     def update(self, speed, dt):
