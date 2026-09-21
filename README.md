@@ -75,3 +75,9 @@ The playfield now changes its atmosphere as the level rises:
 - **Level 7+ — Monsoon Surge:** the heaviest rain, warm gold accent, and the fastest event rhythm.
 
 Special drops are intentionally matched to their feedback: normal drops give `+1`, gold drops give `+3`, and rainbow drops give `+5`. The active world name and event message remain visible in the HUD, while lightning events create a short interactive flash without stopping the game.
+
+## Audio polish
+
+The Pygame build now includes synthesized `thunder.wav`, `milestone.wav`, and `victory.wav` cues in addition to the existing background music, catch sound, and hazard sound. Thunder plays during level 5+ lightning events. Milestone fanfare plays at 25, 50, and 75 points. The victory cue plays at 100 points. The `M` control still toggles the audio layer safely.
+
+For the browser version, the same cues are synthesized with Web Audio so no large audio files are required. The secure Firebase Google Auth and Firestore leaderboard architecture is documented in [FIREBASE_LEADERBOARD.md](FIREBASE_LEADERBOARD.md).

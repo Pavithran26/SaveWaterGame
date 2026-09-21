@@ -96,6 +96,9 @@ class Game:
         self.tank_image = image("tank.png", (TANK_WIDTH, TANK_HEIGHT))
         self.catch_sound = self.load_sound("point_sound.mp3")
         self.miss_sound = self.load_sound("water_sound.mp3")
+        self.thunder_sound = self.load_sound("thunder.wav")
+        self.milestone_sound = self.load_sound("milestone.wav")
+        self.victory_sound = self.load_sound("victory.wav")
         if self.audio_enabled:
             try:
                 pygame.mixer.music.load(BASE_DIR / "background.mp3")
@@ -193,6 +196,7 @@ class Game:
         self.celebration_timer = 0.0
         self.celebration_kind = "victory" if milestone >= 100 else "milestone"
         self.create_particles((WIDTH // 2, 175), GOLD, 42)
+        self.play_sound(self.victory_sound if milestone >= 100 else self.milestone_sound)
 
     def continue_after_celebration(self):
         self.state = "playing"
@@ -222,6 +226,7 @@ class Game:
                 self.banner = "LIGHTNING STRIKE  •  HOLD STEADY"
                 self.banner_timer = 1.0
                 self.create_particles((random.randint(70, WIDTH - 70), 105), BLUE_LIGHT, 18)
+                self.play_sound(self.thunder_sound)
 
     def spawn_water(self):
         kind = "normal"
