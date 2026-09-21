@@ -84,3 +84,13 @@ The first measurable goal is successful round completion: users should be able t
 The game now includes a settings screen with Relaxed, Standard, and Challenge modes. Mode selection changes lives and speed before a round begins. A mission tracker asks the player to catch 15 drops and awards a bonus on completion. Toxic plastic waste appears as a new hazard and can be blocked once by the shield power-up. The game-over screen presents a rotating water-saving tip, allowing the awareness message to continue after the play session.
 
 The release acceptance test covers settings navigation, mode selection, mission progress, obstacle collisions, shield protection, all game-state renders, and safe startup in a headless environment.
+
+## Milestone celebration and victory UX
+
+At 25, 50, 75, and 100 points, gameplay automatically pauses so the player can appreciate the achievement instead of being forced to continue playing continuously. The celebration screen uses an animated trophy, confetti-like particles, a milestone message, and a direct choice: press **Enter**, **Space**, or **P** to continue, or press **Esc** to return to the menu. The 100-point milestone uses the stronger “Legendary Victory” message. Normal play also supports a pause overlay with resume controls through `P`, `Enter`, or `Space`.
+
+## Architecture decision: Firebase Google Auth
+
+Firebase Google Auth is not needed for the current offline Pygame release. The game has local high-score persistence and no user account, cloud save, or online leaderboard requirement. Adding authentication now would increase implementation and privacy complexity without improving the core experience.
+
+Firebase should be introduced only if the product commits to cloud saves, cross-device profiles, verified leaderboards, account-based achievements, or opt-in remote analytics. The safe future architecture is an optional online mode using Firebase Authentication and Firestore. The desktop client may contain public Firebase client configuration, but it must never ship Admin SDK credentials or service-account secrets.

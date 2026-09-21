@@ -1,4 +1,5 @@
 import json
+import math
 import random
 from pathlib import Path
 
@@ -34,6 +35,7 @@ ORANGE = (255, 180, 78)
 RED = (255, 101, 110)
 PURPLE = (188, 130, 255)
 TOXIC = (184, 230, 76)
+GOLD = (255, 215, 90)
 
 MODES = (
     {"name": "RELAXED", "lives": 6, "speed": 0.84, "description": "More lives • gentle storm"},
@@ -140,6 +142,10 @@ class Game:
         self.banner_timer = 0.0
         self.shield = 0
         self.end_tip = random.choice(TIPS)
+        self.completed_milestones = set()
+        self.celebration_milestone = 0
+        self.celebration_timer = 0.0
+        self.celebration_kind = "milestone"
 
     def start_round(self):
         self.reset_round()
@@ -156,6 +162,26 @@ class Game:
         if self.score > self.high_score:
             self.high_score = self.score
             self.save_high_score()
+
+    def add_score(self, points):
+        self.score += points
+        reached = [milestone for milestone in (25, 50, 75, 100) if self.score >= milestone and milestone not in self.completed_milestones]
+        if reached:
+            milestone = max(reached)
+            self.completed_milestones.update(reached)
+            self.start_celebration(milestone)
+
+    def start_celebration(self, milestone):
+        self.state = "celebration"
+        self.celebration_milestone = milestone
+        self.celebration_timer = 0.0
+        self.celebration_kind = "victory" if milestone >= 100 else "milestone"
+        self.create_particles((WIDTH // 2, 175), GOLD, 42)
+
+    def continue_after_celebration(self):
+        self.state = "playing"
+        self.banner = "NEXT WAVE READY"
+        self.banner_timer = 1.0
 
     def play_sound(self, sound):
         if self.audio_enabled and sound:
@@ -220,12 +246,12 @@ class Game:
                 self.combo += 1
                 self.best_combo = max(self.best_combo, self.combo)
                 multiplier = min(5, 1 + self.combo // 5)
-                self.score += multiplier
+                self.add_score(multiplier)
                 self.create_particles(drop.rect.center, BLUE_LIGHT, 12)
                 self.play_sound(self.catch_sound)
                 if self.drops_caught >= self.mission_target and not self.mission_claimed:
                     self.mission_claimed = True
-                    self.score += 10
+                    self.add_score(10)
                     self.banner = "MISSION COMPLETE  +10"
                     self.banner_timer = 1.5
                     self.create_particles(drop.rect.center, GREEN, 20)
@@ -257,7 +283,7 @@ class Game:
                     self.banner = "SHIELD READY"
                     color = PURPLE
                 else:
-                    self.score += 5
+                    self.add_score(5)
                     self.banner = "BONUS DROP  +5"
                     color = ORANGE
                 self.banner_timer = 1.2
@@ -377,6 +403,35 @@ class Game:
         self.screen.blit(panel, (28, top))
         pygame.draw.rect(self.screen, BLUE, (28, top, WIDTH - 56, height), 2, border_radius=12)
 
+    def draw_trophy(self, center, scale=1.0):
+        x, y = center
+        color = GOLD
+        bowl = pygame.Rect(x - round(16 * scale), y - round(12 * scale), round(32 * scale), round(25 * scale))
+        pygame.draw.rect(self.screen, color, bowl, border_radius=6)
+        pygame.draw.arc(self.screen, color, (x - round(28 * scale), y - round(10 * scale), round(18 * scale), round(24 * scale)), math.pi / 2, math.pi * 1.5, max(2, round(3 * scale)))
+        pygame.draw.arc(self.screen, color, (x + round(10 * scale), y - round(10 * scale), round(18 * scale), round(24 * scale)), -math.pi / 2, math.pi / 2, max(2, round(3 * scale)))
+        pygame.draw.rect(self.screen, color, (x - round(4 * scale), y + round(12 * scale), round(8 * scale), round(12 * scale)))
+        pygame.draw.rect(self.screen, color, (x - round(18 * scale), y + round(22 * scale), round(36 * scale), round(6 * scale)), border_radius=3)
+
+    def draw_celebration(self):
+        self.draw_playfield()
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        overlay.fill((3, 12, 24, 190))
+        self.screen.blit(overlay, (0, 0))
+        self.draw_panel(285)
+        pulse = 1 + 0.08 * math.sin(self.celebration_timer * 5)
+        self.draw_trophy((WIDTH // 2, 126), pulse)
+        if self.celebration_kind == "victory":
+            self.draw_text("LEGENDARY VICTORY", self.font_large, GOLD, (WIDTH // 2, 175))
+            self.draw_text("You are a true Water Guardian.", self.font_body, WHITE, (WIDTH // 2, 208))
+        else:
+            self.draw_text("MILESTONE UNLOCKED", self.font_large, GOLD, (WIDTH // 2, 175))
+            self.draw_text(f"{self.celebration_milestone} drops saved!", self.font_body, WHITE, (WIDTH // 2, 208))
+        self.draw_text("Your storm skills are making a difference.", self.font_small, MUTED, (WIDTH // 2, 238))
+        pygame.draw.rect(self.screen, BLUE, (105, 264, 290, 48), border_radius=10)
+        self.draw_text("ENTER  Continue the mission", self.font_body, NAVY, (WIDTH // 2, 288))
+        self.draw_text("ESC  Return to menu", self.font_small, MUTED, (WIDTH // 2, 338))
+
     def draw_menu(self):
         self.draw_background()
         self.draw_panel(350)
@@ -411,9 +466,10 @@ class Game:
         overlay.fill((4, 14, 25, 175))
         self.screen.blit(overlay, (0, 0))
         self.draw_panel(190)
-        self.draw_text("PAUSED", self.font_title, WHITE, (WIDTH // 2, 190))
-        self.draw_text("Press P to continue", self.font_body, BLUE_LIGHT, (WIDTH // 2, 235))
-        self.draw_text("ESC returns to menu", self.font_small, MUTED, (WIDTH // 2, 270))
+        self.draw_text("STORM ON HOLD", self.font_title, WHITE, (WIDTH // 2, 190))
+        self.draw_text("The next drop is waiting for you.", self.font_body, BLUE_LIGHT, (WIDTH // 2, 225))
+        self.draw_text("P / ENTER  Resume play", self.font_small, WHITE, (WIDTH // 2, 260))
+        self.draw_text("ESC  Save this run and return to menu", self.font_small, MUTED, (WIDTH // 2, 286))
 
     def draw_game_over(self):
         self.draw_background()
@@ -438,6 +494,8 @@ class Game:
             self.draw_playfield()
         elif self.state == "paused":
             self.draw_pause()
+        elif self.state == "celebration":
+            self.draw_celebration()
         else:
             self.draw_game_over()
         pygame.display.flip()
@@ -463,8 +521,12 @@ class Game:
             self.start_round()
         elif self.state == "playing" and event.key == pygame.K_p:
             self.state = "paused"
-        elif self.state == "paused" and event.key == pygame.K_p:
+        elif self.state == "paused" and event.key in (pygame.K_p, pygame.K_RETURN, pygame.K_SPACE):
             self.state = "playing"
+        elif self.state == "celebration" and event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            self.continue_after_celebration()
+        elif self.state == "celebration" and event.key == pygame.K_p:
+            self.continue_after_celebration()
         elif self.state == "game_over" and event.key == pygame.K_r:
             self.start_round()
         elif event.key == pygame.K_m:
@@ -487,6 +549,12 @@ class Game:
             self.update_rain(dt)
             if running and self.state == "playing":
                 self.update(dt)
+            elif running and self.state == "celebration":
+                self.celebration_timer += dt
+                for particle in self.particles[:]:
+                    particle.update(dt)
+                    if not particle.alive:
+                        self.particles.remove(particle)
             self.draw()
         pygame.quit()
 

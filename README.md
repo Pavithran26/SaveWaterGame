@@ -54,3 +54,13 @@ The current release adds three selectable storm modes from **S Settings**: Relax
 
 Toxic waste obstacles appear later in a round, especially in Challenge mode. Hitting one costs a life unless the shield power-up blocks it. The game-over screen includes a short water-saving tip so the awareness message continues after the arcade round.
 
+
+## Milestones and celebration flow
+
+At 25, 50, 75, and 100 points, the storm automatically pauses and shows an animated celebration. The player can press **Enter**, **Space**, or **P** to continue the mission, or **Esc** to return to the menu. The 100-point milestone displays a special **Legendary Victory** message. Pressing `P` during normal play opens the improved pause screen, where `P`, `Enter`, or `Space` resumes the run.
+
+## Firebase and Google Auth decision
+
+Firebase Google Auth is **not required for the current desktop game**. The game is intentionally offline, stores the best score locally, and does not need accounts. Adding authentication now would add browser OAuth, token handling, account recovery, privacy, and deployment complexity without improving the core gameplay.
+
+Firebase becomes appropriate if the product adds cloud saves, cross-device profiles, verified online leaderboards, achievements tied to accounts, or remote analytics. At that point, Firebase Authentication and Firestore can be introduced behind an optional online mode. The desktop client must use a public client configuration only and must never contain Firebase Admin or service-account secrets.
