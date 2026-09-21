@@ -4,11 +4,11 @@
 
 SaveWaterGame should feel like a short, polished awareness game rather than a technical prototype. The player should understand the objective within five seconds, start with one obvious action, receive immediate feedback after every catch or miss, and always know what to do next.
 
-The redesigned experience uses a water-blue visual identity, a dark high-contrast playfield, a clear score area, visible lives, and short gameplay sessions. The tone is positive and action-oriented: the game should make water conservation memorable without interrupting the fun.
+The current advanced direction is **Storm Catcher**: a water-blue arcade experience in which the player protects a tank during an animated rainstorm. The storm gets more challenging over time, while combos and power-ups reward accurate play.
 
 ## Primary user journey
 
-The user opens the game and sees a focused start screen with the title, the message “Every drop counts,” the best score, and a single play action. During play, the user moves the tank with the left and right arrow keys. Water drops fall at a controlled pace. A successful catch increases the score and plays a short sound. A missed drop removes one life. When the round ends, the user sees the score, best score, and a clear option to restart.
+The user opens the game and sees a focused start screen with the title, the message “Every drop counts,” a best score, and a single play action. During play, the user moves the tank with the left and right arrow keys. Water drops fall through animated rain. A successful catch increases the score and combo, while a missed drop removes one life and resets the combo. When the round ends, the user sees the final score, level, and best combo with a clear option to restart.
 
 The player can pause with `P`, toggle audio with `M`, and return to the menu with `Esc`. These controls are visible on the start screen so the user does not have to guess.
 
@@ -16,55 +16,65 @@ The player can pause with `P`, toggle audio with `M`, and return to the menu wit
 
 ### Visual system
 
-The interface uses deep navy as the base surface, light blue for water and primary actions, green for positive feedback, orange for progression, and red only for lives and missed drops. Text is grouped into a clear hierarchy: a large title, a readable action label, and muted supporting instructions. Panels use rounded corners and a thin blue outline to create a compact arcade-style presentation.
+The interface uses deep storm navy as the base surface, aqua for water and primary actions, green for positive feedback, orange for progression and bonuses, purple for shields, and red only for danger. Text is grouped into a clear hierarchy. Panels use rounded corners and a thin blue outline to create a compact arcade-style presentation.
+
+The visual layer now includes animated rain streaks, custom vector-style drop, heart, shield, and bonus icons, a level progress bar, a tank shadow, and short-lived particle bursts. These elements are intentionally drawn procedurally so the game does not need a separate icon library or network dependency.
 
 ### Screen definitions
 
 | Screen | Purpose | Required elements |
 |---|---|---|
-| Start screen | Explain the game and start a round | Title, short value statement, play action, controls, best score |
-| Gameplay screen | Keep the user focused on catching drops | Score, lives, game title, falling drops, tank |
+| Start screen | Explain the game and start a round | Title, storm identity, play action, controls, best score |
+| Gameplay screen | Keep the user focused on catching drops | Score, level, progress bar, hearts, combo, rain, drops, tank, power-up status |
 | Pause screen | Let the user safely stop | “Paused” label, resume instruction, menu instruction |
-| Game-over screen | Close the round and motivate replay | Final score, best score, replay instruction, menu instruction |
+| Game-over screen | Close the round and motivate replay | Final score, level, best combo, best score, replay instruction |
 
 ### Feedback behavior
 
-A catch should produce three forms of feedback: the drop disappears, the score changes, and a short sound plays. A miss should reduce the visible life count and play a different short sound. The game should not flash the whole screen or use unreadable text because the playfield is small and action is fast.
+A catch produces an immediate score change, a combo update, a short sound, and aqua particle feedback. A miss removes a heart, resets the combo, plays a different sound, and creates a red impact effect. Every fifth consecutive catch shows a combo banner and applies a higher multiplier. Power-ups show a clear colored icon and a short banner when collected.
 
-## Implemented MVP features
+## Implemented advanced features
 
-The first redesign release includes a menu state, gameplay state, pause state, and game-over state. It also includes a persistent best score stored locally, a mute toggle, safe loading of assets relative to the source file, delta-time movement, a bounded spawn difficulty curve, clamped tank movement, and safe removal of caught or missed drops.
+The current release includes menu, gameplay, pause, and game-over states; persistent best score; mute toggle; safe asset loading; delta-time movement; bounded difficulty; clamped tank movement; safe collision removal; animated decorative rain; custom HUD icons; level progression; combo tracking with a maximum `x5` multiplier; catch and miss particles; a shield power-up; a lightning-style five-point bonus power-up; and a level progress bar.
 
-## Prioritized feature roadmap
+### Feature behavior
 
-### Release 1: polished core game
+| Feature | Player value | Current behavior |
+|---|---|---|
+| Animated rain | Gives the game a strong storm identity | Rain streaks move continuously behind gameplay and intensify by level |
+| Combo multiplier | Rewards accurate play | Every five catches increases the score multiplier up to `x5` |
+| Shield power-up | Provides recovery after a mistake | One missed drop is absorbed and the shield is consumed |
+| Bonus power-up | Creates surprise rewards | Collecting it adds five points immediately |
+| Particles | Makes actions feel responsive | Catch, miss, shield, and bonus events create colored bursts |
+| Level progression | Provides a visible sense of challenge | Level increases every ten score points and affects speed/rain/spawn rate |
+| Vector icons | Improves recognition at small size | Hearts, shield, drop, and lightning icons are rendered in Pygame |
 
-The current implementation should ship with the redesigned screens, reliable collision handling, a stable difficulty curve, a restart flow, and a high-score indicator. This release establishes a complete round lifecycle and removes the most visible prototype defects.
+## Future feature roadmap
 
-### Release 2: engagement and awareness
+### Release 2: awareness and retention
 
-Add a short conservation tip after every round. Examples include “Turn off the tap while brushing” and “Fix leaking taps early.” Add a combo indicator for consecutive catches and a small celebration when the player reaches a score milestone. Keep these elements optional and brief so they do not interrupt play.
+Add a short conservation tip after every round. Examples include “Turn off the tap while brushing” and “Fix leaking taps early.” Add a rotating daily mission such as “Catch 20 drops” or “Reach a 10-catch combo.” Keep messages optional and brief so they do not interrupt play.
 
 ### Release 3: progression
 
-Introduce three difficulty modes: Relaxed, Standard, and Challenge. Relaxed mode should use slower drops and more lives. Challenge mode should increase speed and reduce the spawn interval. Store the best score separately for each mode.
+Introduce Relaxed, Standard, and Challenge modes. Relaxed mode should use slower drops and more lives. Challenge mode should increase speed and reduce the spawn interval. Store the best score separately for each mode.
 
 ### Release 4: content and accessibility
 
-Add keyboard remapping, a reduced-motion option, a no-audio option in settings, color-safe life indicators, and localized text. A simple tutorial overlay can demonstrate the tank movement before the first round.
+Add keyboard remapping, a reduced-motion option, a no-audio option in settings, color-safe life indicators, screen-reader-friendly text where supported, and localized text. A short tutorial overlay can demonstrate tank movement and power-ups before the first round.
 
-### Release 5: community and education
+### Release 5: education and community
 
-Add a weekly conservation challenge, a shareable score card, and a small fact screen containing verified water-saving guidance. Any public leaderboard should be considered only after privacy, moderation, and account requirements are defined.
+Add a reviewed fact screen containing water-saving guidance, a weekly conservation challenge, and a shareable score card. Any public leaderboard should be considered only after privacy, moderation, and account requirements are defined.
 
-## Acceptance criteria for the redesigned MVP
+## Acceptance criteria for the advanced release
 
-The user can start a round without reading a separate document. The tank cannot leave the screen. A catch always increases the score by exactly one. A missed drop always reduces lives by exactly one. Multiple simultaneous catches or misses do not get skipped. The user can pause, resume, restart after game over, toggle audio, and return to the menu. The game can be launched from any working directory because assets are resolved relative to the source file. The best score remains available after restarting the application.
+The user can start a round without reading a separate document. The tank cannot leave the screen. A catch always increases the score and never gets skipped when multiple drops are removed in the same frame. A miss reduces lives exactly once unless a shield is active. Combos reset on a miss and increase score through the visible multiplier. Power-ups can be collected, show their purpose through icons, and apply their effect once. Rain, particles, and all four game states render without external network access. The best score remains available after restarting the application.
 
 ## Product risks and decisions
 
-The game should avoid adding too many visual effects before the core loop is stable. A leaderboard should not be implemented as a local-only feature because users may assume scores are shared or verified. Educational tips should be short and reviewed before publication. The game should remain playable without audio and should not depend on a network connection.
+The game should avoid adding so many effects that falling drops become difficult to see. Power-up frequency should remain low enough that accurate movement is still the main skill. A leaderboard should not be implemented as a local-only feature because users may assume scores are shared or verified. Educational tips should be short and reviewed before publication. The game should remain playable without audio and should not depend on a network connection.
 
 ## Suggested success measures
 
-The first measurable goal is successful round completion: users should be able to open the game, start a round, and understand the controls without support. The next measures are replay rate, average score, average round duration, and the percentage of sessions in which a player reaches the game-over screen. If analytics are added later, they should be opt-in and privacy-conscious.
+The first measurable goal is successful round completion: users should be able to open the game, start a round, and understand the controls without support. The next measures are replay rate, average score, best combo, power-up collection rate, average round duration, and the percentage of sessions in which a player reaches the game-over screen. If analytics are added later, they should be opt-in and privacy-conscious.
